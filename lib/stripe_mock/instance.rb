@@ -109,10 +109,10 @@ module StripeMock
       @base_strategy = TestStrategies::Base.new
     end
 
-    def mock_request(method, url, api_key: nil, api_base: nil, usage: [], params: {}, headers: {})
+    def mock_request(method, url, base_address, params: {}, opts: {}, usage: [])
       return {} if method == :xtest
 
-      api_key ||= (Stripe.api_key || DUMMY_API_KEY)
+      api_key = opts[:api_key] || Stripe.api_key || DUMMY_API_KEY
 
       # Ensure params hash has symbols as keys
       params = Stripe::Util.symbolize_names(params)
@@ -130,14 +130,15 @@ module StripeMock
           @error_queue.dequeue
           raise mock_error
         else
-          res = self.send(handler[:name], handler[:route], method_url, params, headers)
+          res = self.send(handler[:name], handler[:route], method_url, params, opts[:headers] || {})
           puts "           [res]  #{res}" if @debug == true
-          [to_faraday_hash(res), api_key]
+
+          return Stripe::Util.convert_to_stripe_object(res, opts)
         end
       else
         puts "[StripeMock] Warning : Unrecognized endpoint + method : [#{method} #{url}]"
         puts "[StripeMock] params: #{params}" unless params.empty?
-        [{}, api_key]
+        return Stripe::Util.convert_to_stripe_object({}, api_key, opts) # Return an empty Stripe-like object
       end
     end
 
